@@ -43,7 +43,7 @@ Rules:
 If the photo shows no waste, still pick the closest category, set confidence below 0.3 and say so in the summary.`;
 
 export const analyzeWaste = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => Input.parse(input))
+  .validator((input: unknown) => Input.parse(input))
   .handler(async ({ data }) => {
     const key = process.env["LOVABLE_API_KEY"];
     if (!key) throw new Error("AI is not configured for this project.");
@@ -65,7 +65,11 @@ export const analyzeWaste = createServerFn({ method: "POST" })
                   ? `Citizen comment: ${data.comment}`
                   : "Assess this citizen-submitted waste photo.",
               },
-              { type: "image", image: new URL(data.imageDataUrl) },
+              {
+                type: "file",
+                mediaType: data.imageDataUrl.slice(5, data.imageDataUrl.indexOf(";")) || "image/jpeg",
+                data: data.imageDataUrl,
+              },
             ],
           },
         ],
