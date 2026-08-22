@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DispatchRouteImport } from './routes/dispatch'
 import { Route as HotspotsRouteImport } from './routes/hotspots'
 import { Route as ReportsRouteImport } from './routes/reports'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DispatchRoute = DispatchRouteImport.update({
+  id: '/dispatch',
+  path: '/dispatch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HotspotsRoute = HotspotsRouteImport.update({
@@ -31,30 +37,34 @@ const ReportsRoute = ReportsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dispatch': typeof DispatchRoute
   '/hotspots': typeof HotspotsRoute
   '/reports': typeof ReportsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dispatch': typeof DispatchRoute
   '/hotspots': typeof HotspotsRoute
   '/reports': typeof ReportsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dispatch': typeof DispatchRoute
   '/hotspots': typeof HotspotsRoute
   '/reports': typeof ReportsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/hotspots' | '/reports'
+  fullPaths: '/' | '/dispatch' | '/hotspots' | '/reports'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/hotspots' | '/reports'
-  id: '__root__' | '/' | '/hotspots' | '/reports'
+  to: '/' | '/dispatch' | '/hotspots' | '/reports'
+  id: '__root__' | '/' | '/dispatch' | '/hotspots' | '/reports'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DispatchRoute: typeof DispatchRoute
   HotspotsRoute: typeof HotspotsRoute
   ReportsRoute: typeof ReportsRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dispatch': {
+      id: '/dispatch'
+      path: '/dispatch'
+      fullPath: '/dispatch'
+      preLoaderRoute: typeof DispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hotspots': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DispatchRoute: DispatchRoute,
   HotspotsRoute: HotspotsRoute,
   ReportsRoute: ReportsRoute,
 }
