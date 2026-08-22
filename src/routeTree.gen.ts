@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DispatchRouteImport } from './routes/dispatch'
 import { Route as HotspotsRouteImport } from './routes/hotspots'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -17,6 +18,11 @@ import { Route as ReportsRouteImport } from './routes/reports'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DispatchRoute = DispatchRouteImport.update({
@@ -37,12 +43,14 @@ const ReportsRoute = ReportsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/dispatch': typeof DispatchRoute
   '/hotspots': typeof HotspotsRoute
   '/reports': typeof ReportsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/dispatch': typeof DispatchRoute
   '/hotspots': typeof HotspotsRoute
   '/reports': typeof ReportsRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/dispatch': typeof DispatchRoute
   '/hotspots': typeof HotspotsRoute
   '/reports': typeof ReportsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dispatch' | '/hotspots' | '/reports'
+  fullPaths: '/' | '/auth' | '/dispatch' | '/hotspots' | '/reports'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dispatch' | '/hotspots' | '/reports'
-  id: '__root__' | '/' | '/dispatch' | '/hotspots' | '/reports'
+  to: '/' | '/auth' | '/dispatch' | '/hotspots' | '/reports'
+  id: '__root__' | '/' | '/auth' | '/dispatch' | '/hotspots' | '/reports'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   DispatchRoute: typeof DispatchRoute
   HotspotsRoute: typeof HotspotsRoute
   ReportsRoute: typeof ReportsRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dispatch': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   DispatchRoute: DispatchRoute,
   HotspotsRoute: HotspotsRoute,
   ReportsRoute: ReportsRoute,
