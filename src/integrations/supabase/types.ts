@@ -14,7 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          analysis: Json
+          comment: string
+          created_at: string
+          dispatch: Json
+          duplicate_count: number
+          duplicate_of: string | null
+          id: string
+          image_data_url: string | null
+          lat: number
+          lng: number
+          location_label: string
+          priority: string
+          priority_score: number
+          ref: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis: Json
+          comment?: string
+          created_at?: string
+          dispatch: Json
+          duplicate_count?: number
+          duplicate_of?: string | null
+          id?: string
+          image_data_url?: string | null
+          lat: number
+          lng: number
+          location_label?: string
+          priority: string
+          priority_score?: number
+          ref: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis?: Json
+          comment?: string
+          created_at?: string
+          dispatch?: Json
+          duplicate_count?: number
+          duplicate_of?: string | null
+          id?: string
+          image_data_url?: string | null
+          lat?: number
+          lng?: number
+          location_label?: string
+          priority?: string
+          priority_score?: number
+          ref?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
