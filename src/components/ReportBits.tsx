@@ -80,7 +80,7 @@ function Fact({
         {icon}
         {label}
       </dt>
-      <dd className="mt-0.5 font-medium capitalize">{children}</dd>
+      <dd className="mt-0.5 font-medium first-letter:uppercase">{children}</dd>
     </div>
   );
 }
