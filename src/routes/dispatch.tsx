@@ -26,7 +26,7 @@ export const Route = createFileRoute("/dispatch")({
 });
 
 function DispatchPage() {
-  const { reports, setStatus, reset } = useReports();
+  const { reports, setStatus } = useReports();
   const queue = reports
     .filter((r) => r.status !== "resolved" && !r.duplicateOf)
     .sort((a, b) => b.priorityScore - a.priorityScore);
@@ -74,7 +74,9 @@ function DispatchPage() {
               <Button
                 size="sm"
                 className="flex-1"
-                onClick={() => setStatus(report.id, report.status === "new" ? "assigned" : "in_progress")}
+                onClick={() =>
+                  void setStatus(report, report.status === "new" ? "assigned" : "in_progress")
+                }
               >
                 {report.status === "new" ? "Assign crew" : "Start cleanup"}
               </Button>
@@ -82,7 +84,7 @@ function DispatchPage() {
                 size="sm"
                 variant="outline"
                 className="flex-1"
-                onClick={() => setStatus(report.id, "resolved")}
+                onClick={() => void setStatus(report, "resolved")}
               >
                 Mark cleared
               </Button>
@@ -94,9 +96,6 @@ function DispatchPage() {
       {queue.length === 0 ? (
         <div className="py-10 text-center">
           <p className="text-sm text-muted-foreground">Queue is empty — all sites cleared.</p>
-          <Button variant="ghost" size="sm" className="mt-3" onClick={reset}>
-            Reload demo data
-          </Button>
         </div>
       ) : null}
     </AppShell>
