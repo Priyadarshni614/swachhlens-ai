@@ -63,8 +63,36 @@ export type Analysis = {
   summary: string;
 };
 
+export type Visibility = "public" | "anonymous" | "private";
+
+export const VISIBILITY_LABEL: Record<Visibility, string> = {
+  public: "Public",
+  anonymous: "Anonymous",
+  private: "Private",
+};
+
+export const VISIBILITY_HINT: Record<Visibility, string> = {
+  public: "Your name is shown with this complaint in the city feed.",
+  anonymous: "Visible in the city feed, but your name is hidden.",
+  private: "Only you and you alone can see this complaint.",
+};
+
+export type AiFeedback = {
+  verdict: "correct" | "wrong";
+  correctedType?: WasteType;
+  note?: string;
+  at: string;
+};
+
+export type ReportEvent = {
+  status: ReportStatus;
+  note: string;
+  createdAt: string;
+};
+
 export type WasteReport = {
   id: string;
+  rowId?: string;
   createdAt: string;
   imageDataUrl: string;
   comment: string;
@@ -76,6 +104,11 @@ export type WasteReport = {
   status: ReportStatus;
   duplicateOf?: string;
   duplicateCount: number;
+  visibility: Visibility;
+  reporterName?: string | null;
+  feedback?: AiFeedback | null;
+  events?: ReportEvent[];
+  mine?: boolean;
 };
 
 export type Dispatch = {
@@ -170,20 +203,100 @@ export function planDispatch(analysis: Analysis): Dispatch {
   return { team, crewSize, vehicle, estimatedMinutes, recyclingRoute };
 }
 
-/** Duplicate detection: same waste family within ~120 m and 48 h. */
-export function findDuplicate(reports: WasteReport[], candidate: {
-  location: { lat: number; lng: number };
-  wasteType: WasteType;
-  createdAt: string;
-}) {
-  return reports.find((r) => {
-    if (r.status === "resolved") return false;
-    if (r.analysis.wasteType !== candidate.wasteType) return false;
-    const hours =
+export const WASTE_FAMILY: Record<WasteType, string> = {
+  overflowing_bin: "mixed_municipal",
+  garbage_dump: "mixed_municipal",
+  organic_waste: "mixed_municipal",
+  plastic_waste: "dry_recoverable",
+  e_waste: "regulated",
+  hazardous_waste: "regulated",
+  construction_debris: "debris",
+  drain_blockage: "drainage",
+};
+
+const FAMILY_RADIUS: Record<string, number> = {
+  mixed_municipal: 130,
+  dry_recoverable: 110,
+  regulated: 90,
+  debris: 180,
+  drainage: 160,
+};
+
+const VOLUME_RADIUS_BONUS: Record<VolumeClass, number> = {
+  small: 0,
+  medium: 20,
+  large: 45,
+  very_large: 80,
+};
+
+export type DuplicateMatch = {
+  report: WasteReport;
+  distanceMetres: number;
+  hoursApart: number;
+  sameType: boolean;
+  confidence: number;
+};
+
+/**
+ * Duplicate detection: geo + time + waste-family similarity, with a radius that
+ * widens for bulky waste. Exact type matches merge over a wider ring than
+ * same-family matches, so a debris pile and a bin overflow never collapse.
+ */
+export function findDuplicateMatch(
+  reports: WasteReport[],
+  candidate: {
+    location: { lat: number; lng: number };
+    wasteType: WasteType;
+    volumeClass?: VolumeClass;
+    createdAt: string;
+  },
+): DuplicateMatch | null {
+  const family = WASTE_FAMILY[candidate.wasteType];
+  const baseRadius =
+    (FAMILY_RADIUS[family] ?? 120) + VOLUME_RADIUS_BONUS[candidate.volumeClass ?? "medium"];
+
+  const matches: DuplicateMatch[] = [];
+  for (const r of reports) {
+    if (r.status === "resolved" || r.duplicateOf) continue;
+    const sameType = r.analysis.wasteType === candidate.wasteType;
+    const sameFamily = WASTE_FAMILY[r.analysis.wasteType] === family;
+    if (!sameType && !sameFamily) continue;
+
+    const hoursApart =
       Math.abs(new Date(candidate.createdAt).getTime() - new Date(r.createdAt).getTime()) / 36e5;
-    if (hours > 48) return false;
-    return distanceMetres(r.location, candidate.location) <= 120;
-  });
+    const window = sameType ? 72 : 36;
+    if (hoursApart > window) continue;
+
+    const metres = distanceMetres(r.location, candidate.location);
+    const radius = sameType ? baseRadius : baseRadius * 0.6;
+    if (metres > radius) continue;
+
+    const proximity = 1 - metres / radius;
+    const freshness = 1 - hoursApart / window;
+    const confidence = Math.min(
+      0.99,
+      Math.round((0.45 * proximity + 0.25 * freshness + (sameType ? 0.3 : 0.12)) * 100) / 100,
+    );
+    matches.push({ report: r, distanceMetres: Math.round(metres), hoursApart, sameType, confidence });
+  }
+
+  if (!matches.length) return null;
+  matches.sort((a, b) => b.confidence - a.confidence);
+  const best = matches[0]!;
+  return best.confidence >= 0.45 ? best : null;
+}
+
+/** Back-compat helper returning just the duplicate report. */
+export function findDuplicate(
+  reports: WasteReport[],
+  candidate: {
+    location: { lat: number; lng: number };
+    wasteType: WasteType;
+    volumeClass?: VolumeClass;
+    createdAt: string;
+  },
+) {
+  return findDuplicateMatch(reports, candidate)?.report;
 }
 
 export function distanceMetres(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
