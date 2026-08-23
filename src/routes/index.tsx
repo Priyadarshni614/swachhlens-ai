@@ -1,15 +1,36 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useRef, useState } from "react";
-import { Camera, Loader2, MapPin, ScanLine, Sparkles, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Camera,
+  Copy,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  MapPin,
+  ScanLine,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { AnalysisFacts, PriorityPill, TypeChips } from "@/components/ReportBits";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { analyzeWaste } from "@/lib/analyze.functions";
+import { useAuth } from "@/lib/auth";
 import { useReports } from "@/lib/store";
-import { WASTE_LABEL, planDispatch, scoreReport, type Analysis } from "@/lib/waste";
+import {
+  VISIBILITY_HINT,
+  WASTE_LABEL,
+  findDuplicateMatch,
+  planDispatch,
+  scoreReport,
+  type Analysis,
+  type DuplicateMatch,
+  type Visibility,
+} from "@/lib/waste";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -38,18 +59,33 @@ const LOCATIONS = [
   { label: "Campus gate 3, Ward 09", lat: 12.9805, lng: 77.5867 },
 ];
 
+const PRIVACY: { key: Visibility; label: string; icon: typeof Eye }[] = [
+  { key: "public", label: "Public", icon: Eye },
+  { key: "anonymous", label: "Anonymous", icon: EyeOff },
+  { key: "private", label: "Private", icon: Lock },
+];
+
 function ReportPage() {
   const analyze = useServerFn(analyzeWaste);
-  const { addReport } = useReports();
+  const { reports, addReport, cloud } = useReports();
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [image, setImage] = useState<string>("");
   const [comment, setComment] = useState("");
   const [spot, setSpot] = useState(LOCATIONS[0]!);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [submittedId, setSubmittedId] = useState<string | null>(null);
-  const [duplicateOf, setDuplicateOf] = useState<string | undefined>();
+  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [submitted, setSubmitted] = useState<{ id: string; duplicateOf?: string } | null>(null);
+  const [stamp, setStamp] = useState("");
+
+  useEffect(() => {
+    setStamp(new Date().toLocaleString());
+    const t = window.setInterval(() => setStamp(new Date().toLocaleString()), 30000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const pick = (file: File) => {
     if (file.size > 8_000_000) {
@@ -60,7 +96,7 @@ function ReportPage() {
     reader.onload = () => {
       setImage(String(reader.result));
       setAnalysis(null);
-      setSubmittedId(null);
+      setSubmitted(null);
     };
     reader.readAsDataURL(file);
   };
@@ -80,23 +116,41 @@ function ReportPage() {
     }
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!analysis) return;
-    const report = addReport({ imageDataUrl: image, comment, location: spot, analysis });
-    setSubmittedId(report.id);
-    setDuplicateOf(report.duplicateOf);
-    toast.success(
-      report.duplicateOf
-        ? `Merged into existing complaint ${report.duplicateOf}`
-        : `Complaint ${report.id} logged and assigned a priority`,
-    );
+    setSaving(true);
+    try {
+      const { report, duplicate } = await addReport({
+        imageDataUrl: image,
+        comment,
+        location: spot,
+        analysis,
+        visibility,
+      });
+      setSubmitted({ id: report.id, ...(duplicate ? { duplicateOf: duplicate.report.id } : {}) });
+      toast.success(
+        duplicate
+          ? `Linked to existing complaint ${duplicate.report.id} — priority escalated`
+          : `Complaint ${report.id} logged and assigned a priority`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save the complaint.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const preview = analysis
-    ? {
-        ...scoreReport(analysis, 0, 0),
-        dispatch: planDispatch(analysis),
-      }
+    ? { ...scoreReport(analysis, 0, 0), dispatch: planDispatch(analysis) }
+    : null;
+
+  const likelyDuplicate: DuplicateMatch | null = analysis
+    ? findDuplicateMatch(reports, {
+        location: spot,
+        wasteType: analysis.wasteType,
+        volumeClass: analysis.volumeClass,
+        createdAt: new Date().toISOString(),
+      })
     : null;
 
   return (
@@ -105,6 +159,20 @@ function ReportPage() {
       subtitle="Photo + GPS in. Waste type, volume and cleanup plan out."
     >
       <section className="space-y-4">
+        {!user ? (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/60 p-3">
+            <p className="text-xs text-muted-foreground">
+              Sign in to sync your reports and history across devices.
+            </p>
+            <Link
+              to="/auth"
+              className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+            >
+              Sign in
+            </Link>
+          </div>
+        ) : null}
+
         <div className="scan-sweep relative aspect-4/3 overflow-hidden rounded-2xl border border-border bg-secondary/50">
           {image ? (
             <img src={image} alt="Waste site captured by citizen" className="size-full object-cover" />
@@ -166,9 +234,35 @@ function ReportPage() {
             ))}
           </div>
           <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <MapPin className="size-3.5" /> {spot.lat.toFixed(4)}, {spot.lng.toFixed(4)} ·{" "}
-            {new Date().toLocaleString()}
+            <MapPin className="size-3.5" /> {spot.lat.toFixed(4)}, {spot.lng.toFixed(4)}
+            {stamp ? ` · ${stamp}` : ""}
           </p>
+        </div>
+
+        <div className="rounded-2xl border border-border p-3">
+          <p className="text-eyebrow text-muted-foreground">Who can see this report</p>
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {PRIVACY.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setVisibility(key)}
+                className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] transition-colors ${
+                  visibility === key
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border text-muted-foreground"
+                }`}
+              >
+                <Icon className="size-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{VISIBILITY_HINT[visibility]}</p>
+          {!cloud && visibility === "private" ? (
+            <p className="mt-1 text-[11px] text-warn-foreground">
+              Guest reports stay on this device until you sign in.
+            </p>
+          ) : null}
         </div>
 
         <Textarea
@@ -195,12 +289,26 @@ function ReportPage() {
             <p className="text-sm">{analysis.summary}</p>
             {analysis.secondaryTypes.length ? <TypeChips types={analysis.secondaryTypes} /> : null}
             <AnalysisFacts
-              report={{
-                analysis,
-                location: spot,
-                imageDataUrl: image,
-              } as never}
+              report={{ analysis, location: spot, imageDataUrl: image } as never}
             />
+
+            {likelyDuplicate && !submitted ? (
+              <div className="rounded-xl border border-warn/60 bg-warn/15 p-3 text-xs">
+                <p className="flex items-center gap-1.5 font-semibold text-warn-foreground">
+                  <Copy className="size-3.5" /> Possible duplicate ·{" "}
+                  {Math.round(likelyDuplicate.confidence * 100)}% match
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  Complaint {likelyDuplicate.report.id} ({WASTE_LABEL[likelyDuplicate.report.analysis.wasteType]})
+                  was filed {likelyDuplicate.distanceMetres} m away,{" "}
+                  {Math.round(likelyDuplicate.hoursApart)} h ago.
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  Submitting will merge yours into it and raise its priority instead of sending a
+                  second crew.
+                </p>
+              </div>
+            ) : null}
 
             <div className="rounded-xl bg-gradient-ink p-3 text-xs text-primary-foreground">
               <p className="text-eyebrow opacity-70">Recommended dispatch</p>
@@ -212,18 +320,25 @@ function ReportPage() {
               <p className="opacity-80">{preview.dispatch.recyclingRoute}</p>
             </div>
 
-            {submittedId ? (
+            {submitted ? (
               <div className="rounded-xl bg-secondary p-3 text-sm">
                 <p className="font-medium">
-                  {duplicateOf ? `Merged into ${duplicateOf}` : `Complaint ${submittedId} filed`}
+                  {submitted.duplicateOf
+                    ? `Merged into ${submitted.duplicateOf}`
+                    : `Complaint ${submitted.id} filed`}
                 </p>
                 <Link to="/reports" className="text-xs underline">
                   Track it in the complaint feed
                 </Link>
               </div>
             ) : (
-              <Button className="w-full" onClick={submit}>
-                <Sparkles className="size-4" /> Submit complaint
+              <Button className="w-full" onClick={() => void submit()} disabled={saving}>
+                {saving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
+                {likelyDuplicate ? "Submit and merge" : "Submit complaint"}
               </Button>
             )}
           </div>

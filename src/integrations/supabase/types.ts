@@ -41,6 +41,41 @@ export type Database = {
         }
         Relationships: []
       }
+      report_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          id: string
+          note: string
+          report_id: string
+          status: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string
+          report_id: string
+          status: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string
+          report_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_events_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
           analysis: Json
@@ -49,6 +84,7 @@ export type Database = {
           dispatch: Json
           duplicate_count: number
           duplicate_of: string | null
+          feedback: Json | null
           id: string
           image_data_url: string | null
           lat: number
@@ -57,9 +93,11 @@ export type Database = {
           priority: string
           priority_score: number
           ref: string
+          reporter_name: string | null
           status: string
           updated_at: string
           user_id: string
+          visibility: string
         }
         Insert: {
           analysis: Json
@@ -68,6 +106,7 @@ export type Database = {
           dispatch: Json
           duplicate_count?: number
           duplicate_of?: string | null
+          feedback?: Json | null
           id?: string
           image_data_url?: string | null
           lat: number
@@ -76,9 +115,11 @@ export type Database = {
           priority: string
           priority_score?: number
           ref: string
+          reporter_name?: string | null
           status?: string
           updated_at?: string
           user_id: string
+          visibility?: string
         }
         Update: {
           analysis?: Json
@@ -87,6 +128,7 @@ export type Database = {
           dispatch?: Json
           duplicate_count?: number
           duplicate_of?: string | null
+          feedback?: Json | null
           id?: string
           image_data_url?: string | null
           lat?: number
@@ -95,9 +137,11 @@ export type Database = {
           priority?: string
           priority_score?: number
           ref?: string
+          reporter_name?: string | null
           status?: string
           updated_at?: string
           user_id?: string
+          visibility?: string
         }
         Relationships: []
       }
